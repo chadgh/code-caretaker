@@ -1,0 +1,3 @@
+/agentloop
+*.test
+/.agent-status/

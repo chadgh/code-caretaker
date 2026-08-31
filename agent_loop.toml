@@ -1,0 +1,142 @@
+# Configuration for the autonomous agent loop (`npm run loop`).
+#
+# The loop wakes up, walks the steps below in order, dispatches a Claude
+# session for the FIRST step that finds work, then sleeps. Order is priority.
+#
+# Every step accepts these common keys:
+#   enabled       — set false to skip the step entirely (default true)
+#   name          — label used in logs and the status feed (default: type)
+#   prompt        — override the step's built-in prompt template
+#   max_open_prs  — skip the step when more than N PRs are open (default: no cap)
+#
+# [loop] values can be overridden by environment variables:
+#   REPO, CHECK_INTERVAL_SECONDS, TOKEN_SLEEP_SECONDS,
+#   CLAUDE_TIMEOUT_SECONDS, AGENT_STATUS_FILE
+
+[loop]
+repo = "chadgh/class-cash"
+check_interval_seconds = 300
+token_sleep_seconds = 3600
+claude_timeout_seconds = 1800
+status_file = ".agent-status/events.jsonl"
+
+# Fix broken PRs first — red CI checks or a merge conflict with the base branch.
+# This pushes to an existing branch, so it never adds a PR and deliberately
+# carries no max_open_prs cap.
+[[step]]
+type = "failing_prs"
+
+[[step]]
+type = "dependabot_alerts"
+
+[[step]]
+type = "prod_errors"
+ssh_host = "class-cash.chaggie.com"
+ssh_user = "chadgh"
+service = "class-cash-api.service"
+lookback = "5 minutes ago"
+
+# New feature work is the only thing gated on the open-PR count.
+[[step]]
+type = "labeled_issues"
+label = "for-agent"
+max_open_prs = 3
+
+[[step]]
+type = "command"
+name = "refine-issues"
+enabled = true
+check = "gh issue list --search \"no:assignee state:open label:needs-refinement\""
+# check = "gh issue list --label needs-refinement --state open | grep needs-refinement"
+prompt = """
+You are an expert in this software system and work to move issues labeled needs-refinement
+to have clarity and shape. Given the issues labeled needs-refinement you will work
+through the following steps to refine issues until the needs-refinement label can
+be removed and the for-agent or for-human label can be applied.
+
+High-level process:
+1. Make a comment on the issue with open questions and design decisions that 
+need human feedback. Assign the issue to @chadgh when complete.
+2. Update the description of the issue with an implementation plan. Once complete
+assign the issue to @chadgh
+3. Finalize the issue, updating decription or comments and otherwise prepare the
+ticket to be able to be handed off. Assign the label for-agent or for-human and
+remove the label needs-refinement
+
+Detailed process:
+Every time you are triggered you are going to select one open issue that is not assigned
+to anyone and is labeled with needs-refinement. If the issue is not open, ignore it
+if the issue is not labeled with needs-refinement, ignore it. If the issue is assigned
+to anyone, ignore it.
+
+Once you have an open, unassigned, issue labeled needs-refinement you are going to
+decide which step the issue needs done and complete that step only.
+
+1. If the issue is a simple description or a design plan and not an implementation plan
+then we need to create a temporary implementation plan and leave a comment in the issue
+for @chadgh to also make a comment and answer any open questions. You should understand
+the system and the request in the issue as best you can, then generate a high-level
+implementation plan. Comment the high level implementation plan and any open questions
+in a comment on the issue. Assign the issue to @chadgh.
+
+2. If the issue has a high-level implementation plan from a previous agent in the comments
+and @chadgh has left a comment addressing the open questions, you are to know generate
+the detailed implementation plan and update the issue description with that detailed
+implementation plan. Once ready, assign the issue to @chadgh.
+
+3. If the issue has been updated with a detailed implementation plan by a previous agent
+in the description and it isn't assigned to anyone. Take one final pass over the description
+making sure to incorrporate any additional information left in comments by @chadgh. Once that
+is done, decide if the implementation plan should be able to be done by an autonomous AI agent
+or needs a human. If it should be able to be completed successfully by an AI agent, apply the
+for-agent label. If a human needs to address things in the issue, apply the for-human label.
+Remove the needs-refinement label.
+"""
+
+[[step]]
+type = "command"
+name = "address-teacher-feedback"
+enabled = true
+model = "sonnet"
+# check = "gh issue list --search \"no:assignee state:open label:teacher-feedback\" -L 1 --json number,body" 
+check = """
+    output=$(gh issue list --search "no:assignee state:open label:teacher-feedback" -L 1 --json number,body);
+    [ "$output" != "[]" ] && echo "$output"
+"""
+prompt = """
+You are a problem/bug and feature request expert. You will act as the product manager for
+this project.
+
+Given the output feedback. Lines starting with '>' are lines written by the teacher as
+feedback for the system maintainers. Lines not starting with '>' are information about the
+person who submitted and what page they were on.
+
+Analyze the feedback based on the context of the system. Determine if more information is
+needed or if there is enough to make a decision on what should be done with the feedback.
+Determine if (1) the feedback is clear and straightforward and just needs human decision on
+next steps, (2) the feedback is unclear or confusing and needs extra information from the
+person who submitted, (3) the feedback is duplicate of another open issue, or (4) the feedback is purely informational and just needs to be seen
+by @chadgh. In all cases after you've determined what situation the feedback is in, you are
+going to finish, by making a comment about your decision and possible next steps if applicable,
+remove the teacher-feedback label, add the for-human label, assign the issue to @chadgh.
+"""
+
+# Example of the no-code escape hatch. Copy this shape to try a new step:
+# give it a shell `check` command and a prompt; if the command prints
+# anything, that output lands in {output} and a session is dispatched.
+#
+# Optional `model` picks which Claude model runs the dispatched session
+# (passed to the `claude` CLI as `--model`); omit it to use the default.
+#
+# [[step]]
+# type = "command"
+# name = "stale-branches"
+# enabled = false
+# model = "claude-opus-4-8"
+# check = "git branch -r --merged origin/main | grep -v main"
+# prompt = """
+# You are an autonomous agent working on {repo}.
+# These remote branches are merged and stale:
+# {output}
+# Delete them.
+# """
