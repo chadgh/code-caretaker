@@ -19,7 +19,18 @@
 #      labeled_issues) if none of the above exist
 #
 # The loop shells out to `claude`, `gh`, `git`, and — for the prod_errors step
-# — `ssh`. All of them must be on PATH and already authenticated.
+# — `ssh`. All of them must be on PATH and already authenticated. The published
+# container image bundles all four.
+#
+# Any step here can also be run once and then exit, which is how you try one
+# out or drive it from cron or CI:
+#
+#     code-caretaker steps                     # what this file declares
+#     code-caretaker step labeled_issues       # run one of them, then exit
+#     code-caretaker step labeled_issues --dry-run   # just show the prompt
+#
+# Naming a step runs it even when `enabled = false` below, so a step can stay
+# on hand without the loop picking it up.
 
 
 # -----------------------------------------------------------------------------
