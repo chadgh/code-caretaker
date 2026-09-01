@@ -1,0 +1,33 @@
+#!/bin/sh
+# code-caretaker pre-commit hook: runs `make verify` (gofmt check, go vet,
+# go test, go build) and refuses the commit if anything fails.
+#
+# Install with `make hooks` (points core.hooksPath at .githooks/).
+# Bypass once with `git commit --no-verify`, or with SKIP_HOOKS=1 git commit.
+
+set -eu
+
+if [ "${SKIP_HOOKS:-}" = "1" ]; then
+	echo "pre-commit: skipped (SKIP_HOOKS=1)"
+	exit 0
+fi
+
+cd "$(git rev-parse --show-toplevel)"
+
+# The checks run against the working tree, not the index, so unstaged edits are
+# part of what gets verified. Say so rather than quietly checking something
+# other than what is about to be committed.
+if ! git diff --quiet; then
+	echo "pre-commit: note - unstaged changes present; verifying the working tree, not just the index." >&2
+fi
+
+echo "pre-commit: make verify"
+if ! make verify; then
+	cat >&2 <<'EOF'
+
+pre-commit: verification failed, commit aborted.
+  Fix the failures above ('make fmt' handles formatting), or bypass with:
+    git commit --no-verify
+EOF
+	exit 1
+fi

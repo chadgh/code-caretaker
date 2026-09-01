@@ -107,3 +107,22 @@ make test
 make fmt
 make help     # all targets
 ```
+
+### Git hooks
+
+A `pre-commit` hook lives in `.githooks/` and runs `make verify`, so a commit
+is refused if the tree is unformatted or fails vet, tests, or the build. Hooks
+are not installed by a clone — enable them once per checkout:
+
+```sh
+make hooks             # git config core.hooksPath .githooks
+make hooks-uninstall   # back to .git/hooks/
+```
+
+The hook checks the working tree rather than the index, and warns when the two
+differ. To bypass it for a single commit:
+
+```sh
+git commit --no-verify
+SKIP_HOOKS=1 git commit
+```

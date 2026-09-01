@@ -10,7 +10,7 @@ GOFLAGS ?=
 .PHONY: help
 help: ## Show this help.
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) \
-		| awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-10s\033[0m %s\n", $$1, $$2}'
+		| awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
 
 .PHONY: build
 build: ## Build the loop binary into ./$(BINARY).
@@ -39,6 +39,16 @@ vet: ## Run go vet.
 
 .PHONY: verify
 verify: fmt-check vet test build ## Everything CI should check: format, vet, test, build.
+
+.PHONY: hooks
+hooks: ## Install the git hooks in .githooks/ (pre-commit runs `make verify`).
+	git config core.hooksPath .githooks
+	@echo "core.hooksPath -> .githooks"
+
+.PHONY: hooks-uninstall
+hooks-uninstall: ## Stop using .githooks/ and go back to .git/hooks/.
+	@git config --unset core.hooksPath || true
+	@echo "core.hooksPath unset"
 
 .PHONY: run
 run: ## Run the loop against this repo using $(CONFIG). Ctrl-C to stop.
