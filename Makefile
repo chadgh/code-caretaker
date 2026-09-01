@@ -48,3 +48,4 @@ run: ## Run the loop against this repo using $(CONFIG). Ctrl-C to stop.
 clean: ## Remove build output.
 	rm -f $(BINARY)
 	go clean -testcache
+	rm -rf .agent-status
