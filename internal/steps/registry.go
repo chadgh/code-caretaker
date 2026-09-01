@@ -41,12 +41,18 @@ func Build(stepConfigs []core.StepConfig) ([]core.Step, error) {
 	return built, nil
 }
 
-func validTypes() string {
+// Types lists the known step types in sorted order.
+func Types() []string {
 	types := make([]string, 0, len(stepTypes))
 	for t := range stepTypes {
 		types = append(types, t)
 	}
 	sort.Strings(types)
+	return types
+}
+
+func validTypes() string {
+	types := Types()
 	quoted := make([]string, len(types))
 	for i, t := range types {
 		quoted[i] = "'" + t + "'"

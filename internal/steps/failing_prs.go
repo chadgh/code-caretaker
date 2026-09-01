@@ -111,7 +111,7 @@ func (s *FailingPrsStep) FindWork(ctx *core.CycleContext) *core.Finding {
 	reason := summarizeFailing(f)
 	number := gh.Number(f.pr)
 	label := "PR #" + strconv.Itoa(number) + " " + reason
-	status.Logf("PR #%d has %s. Dispatching claude session...", number, reason)
+	status.Logf("PR #%d has %s.", number, reason)
 	return &core.Finding{
 		Label: label,
 		Prompt: s.Render(map[string]string{

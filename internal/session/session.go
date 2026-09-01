@@ -31,9 +31,19 @@ type Result struct {
 	ReturnCode int
 }
 
-// Sleep is the sleep function used for token-exhaustion pauses; it is a package
-// variable so tests can substitute it.
-var Sleep = time.Sleep
+// Outcome classifies how a dispatched session ended. Callers decide what to do
+// about it — HandleSession reports, it never sleeps.
+type Outcome int
+
+const (
+	// OutcomeOK is a session that finished successfully.
+	OutcomeOK Outcome = iota
+	// OutcomeFailed is a session that exited non-zero.
+	OutcomeFailed
+	// OutcomeTokenExhausted is a session that ran out of Claude usage. The
+	// caller should back off rather than dispatch again immediately.
+	OutcomeTokenExhausted
+)
 
 // runCommand executes a command and returns its combined result. It is a
 // package variable so tests can substitute the real subprocess call.
@@ -107,21 +117,18 @@ func UsageAvailable() bool {
 }
 
 // HandleSession inspects a finished session, emitting notify events for bad
-// outcomes. It returns true if it slept for token exhaustion, so the caller
-// can skip the normal inter-cycle sleep. Actions is appended to.
-func HandleSession(label string, result Result, actions *[]string,
-	statusFile string, tokenSleep int) bool {
-
+// outcomes and appending to actions. It reports how the session ended; backing
+// off after OutcomeTokenExhausted is the caller's job.
+func HandleSession(label string, result Result, actions *[]string, statusFile string) Outcome {
 	if IsTokenExhausted(result) {
-		msg := fmt.Sprintf("Token exhaustion during %s. Pausing %ds.", label, tokenSleep)
+		msg := fmt.Sprintf("Token exhaustion during %s.", label)
 		*actions = append(*actions, msg)
 		status.Log(msg)
 		status.Emit(statusFile, status.Event{
 			Event: "token_exhausted", Level: "warn", Notify: true, Summary: msg,
-			Fields: map[string]any{"sleep_seconds": tokenSleep, "label": label},
+			Fields: map[string]any{"label": label},
 		})
-		Sleep(time.Duration(tokenSleep) * time.Second)
-		return true
+		return OutcomeTokenExhausted
 	}
 
 	if result.ReturnCode != 0 {
@@ -136,11 +143,11 @@ func HandleSession(label string, result Result, actions *[]string,
 				"output_tail": tail(result.Stdout, 500),
 			},
 		})
-		return false
+		return OutcomeFailed
 	}
 
 	*actions = append(*actions, fmt.Sprintf("Dispatched and completed Claude session for %s.", label))
-	return false
+	return OutcomeOK
 }
 
 func tail(s string, n int) string {

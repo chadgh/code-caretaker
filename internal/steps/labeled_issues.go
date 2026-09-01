@@ -96,7 +96,7 @@ func (s *LabeledIssuesStep) FindWork(ctx *core.CycleContext) *core.Finding {
 	number := gh.Number(issue)
 	title := gh.String(issue, "title")
 	label := "issue #" + strconv.Itoa(number) + ": " + title
-	status.Logf("Found %s %s. Dispatching claude session...", s.label, label)
+	status.Logf("Found %s %s.", s.label, label)
 	return &core.Finding{
 		Label: label,
 		Prompt: s.Render(map[string]string{

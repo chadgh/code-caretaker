@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/chadgh/code-caretaker/internal/core"
 	"github.com/chadgh/code-caretaker/internal/session"
@@ -40,8 +39,8 @@ func testConfig(t *testing.T) core.LoopConfig {
 // env holds the overridable collaborators for one test and restores them.
 type env struct {
 	claudeCalls []claudeCall
-	sleeps      []time.Duration
 	prCalls     int
+	resetCalls  int
 	resetArg    string
 	restore     func()
 }
@@ -57,28 +56,20 @@ func setup(t *testing.T, openPRs []map[string]any, claudeResult session.Result, 
 	t.Helper()
 	e := &env{}
 	origReset, origUsage, origPRs := resetToMain, usageAvailable, getOpenPRs
-	origClaude, origHandle, origSleep := runClaudeSession, handleSession, sleep
+	origClaude, origHandle := runClaudeSession, handleSession
 
-	resetToMain = func(root string) { e.resetArg = root }
+	resetToMain = func(root string) { e.resetCalls++; e.resetArg = root }
 	usageAvailable = func() bool { return usage }
 	getOpenPRs = func(repo string) []map[string]any { e.prCalls++; return openPRs }
 	runClaudeSession = func(prompt, root string, timeout int, model string) session.Result {
 		e.claudeCalls = append(e.claudeCalls, claudeCall{prompt, root, timeout, model})
 		return claudeResult
 	}
-	handleSession = func(label string, r session.Result, actions *[]string, sf string, ts int) bool {
-		return session.HandleSession(label, r, actions, sf, ts)
-	}
-	sleep = func(d time.Duration) { e.sleeps = append(e.sleeps, d) }
-
-	// Avoid a real 3600s pause inside HandleSession on token exhaustion.
-	origSessionSleep := session.Sleep
-	session.Sleep = func(d time.Duration) { e.sleeps = append(e.sleeps, d) }
+	handleSession = session.HandleSession
 
 	e.restore = func() {
 		resetToMain, usageAvailable, getOpenPRs = origReset, origUsage, origPRs
-		runClaudeSession, handleSession, sleep = origClaude, origHandle, origSleep
-		session.Sleep = origSessionSleep
+		runClaudeSession, handleSession = origClaude, origHandle
 	}
 	return e
 }
@@ -90,12 +81,17 @@ func exhaustedResult() session.Result {
 	return session.Result{Stdout: "usage limit reached", ReturnCode: 0}
 }
 
+// once runs a pass with the default options and discards the action log.
+func once(steps []core.Step, cfg core.LoopConfig) Result {
+	return RunOnce(steps, cfg, Options{}, &[]string{})
+}
+
 func TestDispatchesFirstStepWithWork(t *testing.T) {
 	e := setup(t, nil, okResult(), true)
 	defer e.restore()
 	first := &fakeStep{name: "first", finding: &core.Finding{Label: "work", Prompt: "do it"}}
 	second := &fakeStep{name: "second", finding: &core.Finding{Label: "other", Prompt: "other"}}
-	RunOneCycle([]core.Step{first, second}, testConfig(t), &[]string{})
+	once([]core.Step{first, second}, testConfig(t))
 	if len(e.claudeCalls) != 1 || e.claudeCalls[0].prompt != "do it" {
 		t.Errorf("claude calls = %+v", e.claudeCalls)
 	}
@@ -106,7 +102,7 @@ func TestLaterStepsNotCheckedAfterMatch(t *testing.T) {
 	defer e.restore()
 	first := &fakeStep{name: "first", finding: &core.Finding{Label: "work", Prompt: "do it"}}
 	second := &fakeStep{name: "second", finding: &core.Finding{Label: "other", Prompt: "other"}}
-	RunOneCycle([]core.Step{first, second}, testConfig(t), &[]string{})
+	once([]core.Step{first, second}, testConfig(t))
 	if !first.called || second.called {
 		t.Errorf("first.called=%v second.called=%v", first.called, second.called)
 	}
@@ -117,7 +113,7 @@ func TestFallsThroughStepsReturningNil(t *testing.T) {
 	defer e.restore()
 	first := &fakeStep{name: "first", finding: nil}
 	second := &fakeStep{name: "second", finding: &core.Finding{Label: "work", Prompt: "second's work"}}
-	RunOneCycle([]core.Step{first, second}, testConfig(t), &[]string{})
+	once([]core.Step{first, second}, testConfig(t))
 	if !second.called || e.claudeCalls[0].prompt != "second's work" {
 		t.Errorf("second.called=%v calls=%+v", second.called, e.claudeCalls)
 	}
@@ -127,15 +123,28 @@ func TestNoDispatchWhenNoStepHasWork(t *testing.T) {
 	e := setup(t, nil, okResult(), true)
 	defer e.restore()
 	var actions []string
-	shouldSleep := RunOneCycle([]core.Step{&fakeStep{name: "a"}}, testConfig(t), &actions)
+	res := RunOnce([]core.Step{&fakeStep{name: "a"}}, testConfig(t), Options{}, &actions)
 	if len(e.claudeCalls) != 0 {
 		t.Errorf("unexpected claude calls: %+v", e.claudeCalls)
 	}
-	if !shouldSleep {
-		t.Error("expected shouldSleep true")
+	if res.FoundWork() || res.Backoff() {
+		t.Errorf("result = %+v", res)
 	}
 	if !anyContains(actions, "Nothing to do") {
 		t.Errorf("actions = %v", actions)
+	}
+}
+
+func TestResultNamesTheStepThatFoundWork(t *testing.T) {
+	e := setup(t, nil, okResult(), true)
+	defer e.restore()
+	finding := &core.Finding{Label: "issue #4", Prompt: "do it"}
+	res := once([]core.Step{&fakeStep{name: "labeled_issues", finding: finding}}, testConfig(t))
+	if res.Step != "labeled_issues" || res.Label != "issue #4" || res.Prompt != "do it" {
+		t.Errorf("result = %+v", res)
+	}
+	if !res.Dispatched || res.Outcome != session.OutcomeOK {
+		t.Errorf("result = %+v", res)
 	}
 }
 
@@ -143,7 +152,7 @@ func TestOpenPRsFetchedOncePerCycle(t *testing.T) {
 	e := setup(t, nil, okResult(), true)
 	defer e.restore()
 	steps := []core.Step{&fakeStep{name: "a"}, &fakeStep{name: "b"}}
-	RunOneCycle(steps, testConfig(t), &[]string{})
+	once(steps, testConfig(t))
 	if e.prCalls != 1 {
 		t.Errorf("prCalls = %d", e.prCalls)
 	}
@@ -157,40 +166,40 @@ func TestPreDispatchEventsEmittedBeforeSession(t *testing.T) {
 		Event: "prod_errors", Level: "error", Notify: true, Summary: "boom",
 		Fields: map[string]any{"logs": "x"},
 	}}}
-	RunOneCycle([]core.Step{&fakeStep{name: "prod", finding: finding}}, cfg, &[]string{})
+	once([]core.Step{&fakeStep{name: "prod", finding: finding}}, cfg)
 	data, _ := os.ReadFile(cfg.StatusFile)
 	if !strings.Contains(string(data), "prod_errors") {
 		t.Errorf("status feed = %s", data)
 	}
 }
 
-func TestTokenExhaustionReportsNoFurtherSleep(t *testing.T) {
+func TestTokenExhaustionAsksForBackoff(t *testing.T) {
 	e := setup(t, nil, exhaustedResult(), true)
 	defer e.restore()
 	finding := &core.Finding{Label: "work", Prompt: "do it"}
-	shouldSleep := RunOneCycle([]core.Step{&fakeStep{name: "a", finding: finding}}, testConfig(t), &[]string{})
-	if shouldSleep {
-		t.Error("expected shouldSleep false")
+	res := once([]core.Step{&fakeStep{name: "a", finding: finding}}, testConfig(t))
+	if !res.Backoff() || res.Outcome != session.OutcomeTokenExhausted {
+		t.Errorf("result = %+v", res)
 	}
 }
 
-func TestSuccessfulDispatchReportsSleep(t *testing.T) {
+func TestSuccessfulDispatchDoesNotAskForBackoff(t *testing.T) {
 	e := setup(t, nil, okResult(), true)
 	defer e.restore()
 	finding := &core.Finding{Label: "work", Prompt: "do it"}
-	shouldSleep := RunOneCycle([]core.Step{&fakeStep{name: "a", finding: finding}}, testConfig(t), &[]string{})
-	if !shouldSleep {
-		t.Error("expected shouldSleep true")
+	res := once([]core.Step{&fakeStep{name: "a", finding: finding}}, testConfig(t))
+	if res.Backoff() {
+		t.Errorf("result = %+v", res)
 	}
 }
 
-func TestUsageLimitSkipsCycleAndSleepsTokenSleep(t *testing.T) {
+func TestUsageLimitSkipsStepsAndAsksForBackoff(t *testing.T) {
 	e := setup(t, nil, okResult(), false)
 	defer e.restore()
 	step := &fakeStep{name: "a", finding: &core.Finding{Label: "work", Prompt: "do it"}}
-	shouldSleep := RunOneCycle([]core.Step{step}, testConfig(t), &[]string{})
-	if shouldSleep {
-		t.Error("expected shouldSleep false")
+	res := once([]core.Step{step}, testConfig(t))
+	if !res.UsageBlocked || !res.Backoff() {
+		t.Errorf("result = %+v", res)
 	}
 	if step.called {
 		t.Error("step should not be checked")
@@ -198,17 +207,42 @@ func TestUsageLimitSkipsCycleAndSleepsTokenSleep(t *testing.T) {
 	if len(e.claudeCalls) != 0 {
 		t.Errorf("claude called: %+v", e.claudeCalls)
 	}
-	if len(e.sleeps) != 1 || e.sleeps[0] != 3600*time.Second {
-		t.Errorf("sleeps = %v", e.sleeps)
-	}
 }
 
 func TestCycleResetsToMainFirst(t *testing.T) {
 	e := setup(t, nil, okResult(), true)
 	defer e.restore()
-	RunOneCycle([]core.Step{&fakeStep{name: "a"}}, testConfig(t), &[]string{})
+	once([]core.Step{&fakeStep{name: "a"}}, testConfig(t))
 	if e.resetArg != "/repo" {
 		t.Errorf("resetArg = %q", e.resetArg)
+	}
+}
+
+func TestSkipResetLeavesTheWorkingTreeAlone(t *testing.T) {
+	e := setup(t, nil, okResult(), true)
+	defer e.restore()
+	RunOnce([]core.Step{&fakeStep{name: "a"}}, testConfig(t),
+		Options{SkipReset: true}, &[]string{})
+	if e.resetCalls != 0 {
+		t.Errorf("resetCalls = %d", e.resetCalls)
+	}
+}
+
+func TestDryRunReportsWorkWithoutDispatching(t *testing.T) {
+	// usage=false: a dry run must not need Claude usage to report its prompt.
+	e := setup(t, nil, okResult(), false)
+	defer e.restore()
+	finding := &core.Finding{Label: "work", Prompt: "the rendered prompt"}
+	res := RunOnce([]core.Step{&fakeStep{name: "a", finding: finding}}, testConfig(t),
+		Options{DryRun: true}, &[]string{})
+	if len(e.claudeCalls) != 0 {
+		t.Errorf("claude called: %+v", e.claudeCalls)
+	}
+	if !res.FoundWork() || res.Dispatched || res.Prompt != "the rendered prompt" {
+		t.Errorf("result = %+v", res)
+	}
+	if e.resetCalls != 0 {
+		t.Errorf("a dry run reset the working tree (%d calls)", e.resetCalls)
 	}
 }
 
@@ -216,7 +250,7 @@ func TestClaudeSessionGetsRepoRootAndTimeout(t *testing.T) {
 	e := setup(t, nil, okResult(), true)
 	defer e.restore()
 	finding := &core.Finding{Label: "work", Prompt: "do it"}
-	RunOneCycle([]core.Step{&fakeStep{name: "a", finding: finding}}, testConfig(t), &[]string{})
+	once([]core.Step{&fakeStep{name: "a", finding: finding}}, testConfig(t))
 	if e.claudeCalls[0].repoRoot != "/repo" || e.claudeCalls[0].timeout != 1800 {
 		t.Errorf("call = %+v", e.claudeCalls[0])
 	}
@@ -226,7 +260,7 @@ func TestClaudeSessionGetsModelFromFinding(t *testing.T) {
 	e := setup(t, nil, okResult(), true)
 	defer e.restore()
 	finding := &core.Finding{Label: "work", Prompt: "do it", Model: "claude-opus-4-8"}
-	RunOneCycle([]core.Step{&fakeStep{name: "a", finding: finding}}, testConfig(t), &[]string{})
+	once([]core.Step{&fakeStep{name: "a", finding: finding}}, testConfig(t))
 	if e.claudeCalls[0].model != "claude-opus-4-8" {
 		t.Errorf("model = %q", e.claudeCalls[0].model)
 	}
@@ -236,7 +270,7 @@ func TestClaudeSessionModelEmptyWhenFindingOmitsIt(t *testing.T) {
 	e := setup(t, nil, okResult(), true)
 	defer e.restore()
 	finding := &core.Finding{Label: "work", Prompt: "do it"}
-	RunOneCycle([]core.Step{&fakeStep{name: "a", finding: finding}}, testConfig(t), &[]string{})
+	once([]core.Step{&fakeStep{name: "a", finding: finding}}, testConfig(t))
 	if e.claudeCalls[0].model != "" {
 		t.Errorf("model = %q", e.claudeCalls[0].model)
 	}

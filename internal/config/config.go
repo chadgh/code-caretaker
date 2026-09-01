@@ -261,9 +261,13 @@ func buildStepConfig(table map[string]any, index int) (core.StepConfig, error) {
 
 // Load resolves and validates the full configuration. When env is nil the
 // process environment is used.
+//
+// Every declared step is returned, disabled ones included, so that a caller
+// naming a single step can run one the loop would skip. Callers that walk the
+// whole list want Config.EnabledSteps.
 func Load(cliPath string, repoRoot string, env map[string]string) (core.Config, error) {
 	if env == nil {
-		env = envMap()
+		env = EnvMap()
 	}
 
 	path, err := FindConfigPath(cliPath, repoRoot, env)
@@ -295,15 +299,15 @@ func Load(cliPath string, repoRoot string, env map[string]string) (core.Config, 
 		if err != nil {
 			return core.Config{}, err
 		}
-		if sc.Enabled {
-			steps = append(steps, sc)
-		}
+		steps = append(steps, sc)
 	}
 
 	return core.Config{Loop: loop, Steps: steps}, nil
 }
 
-func envMap() map[string]string {
+// EnvMap snapshots the process environment as a map, in the shape Load takes.
+// Callers layer their own overrides on top before passing it in.
+func EnvMap() map[string]string {
 	out := map[string]string{}
 	for _, kv := range os.Environ() {
 		if idx := strings.IndexByte(kv, '='); idx >= 0 {

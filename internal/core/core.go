@@ -26,7 +26,8 @@ type LoopConfig struct {
 type StepConfig struct {
 	Type string
 	Name string
-	// Enabled defaults to true; disabled steps are dropped during loading.
+	// Enabled defaults to true. The loop walks only enabled steps; naming a
+	// step explicitly runs it either way.
 	Enabled bool
 	// Prompt overrides the step's built-in prompt template; nil means "use
 	// the default".
@@ -37,10 +38,23 @@ type StepConfig struct {
 	Params map[string]any
 }
 
-// Config is the fully-resolved configuration for a run.
+// Config is the fully-resolved configuration for a run. Steps holds every
+// declared step in file order, disabled ones included.
 type Config struct {
 	Loop  LoopConfig
 	Steps []StepConfig
+}
+
+// EnabledSteps returns the steps the loop should walk, in order, dropping any
+// the config disabled.
+func (c Config) EnabledSteps() []StepConfig {
+	enabled := make([]StepConfig, 0, len(c.Steps))
+	for _, s := range c.Steps {
+		if s.Enabled {
+			enabled = append(enabled, s)
+		}
+	}
+	return enabled
 }
 
 // Finding is the work a step found. Prompt is fully rendered and ready to

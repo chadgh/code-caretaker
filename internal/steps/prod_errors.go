@@ -87,7 +87,7 @@ func (s *ProdErrorsStep) FindWork(ctx *core.CycleContext) *core.Finding {
 	if logs == "" {
 		return nil
 	}
-	status.Log("Found production errors. Dispatching claude session...")
+	status.Log("Found production errors.")
 	return &core.Finding{
 		Label: "production errors",
 		Prompt: s.Render(map[string]string{

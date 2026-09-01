@@ -84,7 +84,7 @@ func (s *CommandStep) FindWork(ctx *core.CycleContext) *core.Finding {
 	if output == "" {
 		return nil
 	}
-	status.Logf("Step '%s' check produced output. Dispatching claude session...", s.Name())
+	status.Logf("Step '%s' check produced output.", s.Name())
 	return &core.Finding{
 		Label: s.Name(),
 		Prompt: s.Render(map[string]string{

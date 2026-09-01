@@ -114,7 +114,7 @@ func (s *DependabotStep) FindWork(ctx *core.CycleContext) *core.Finding {
 		return nil
 	}
 	label := strconv.Itoa(len(alerts)) + " Dependabot alert(s)"
-	status.Logf("Found %s. Dispatching claude session...", label)
+	status.Logf("Found %s.", label)
 	return &core.Finding{
 		Label: label,
 		Prompt: s.Render(map[string]string{

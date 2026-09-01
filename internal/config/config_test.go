@@ -156,19 +156,40 @@ type = "failing_prs"
 	}
 }
 
-func TestDisabledStepsAreDropped(t *testing.T) {
-	dir := t.TempDir()
-	path := write(t, dir, `
+const disabledFirstStep = `
 [[step]]
 type = "failing_prs"
 enabled = false
 
 [[step]]
 type = "prod_errors"
-`)
-	got := stepTypes(mustLoad(t, path, dir, env()))
+`
+
+func TestDisabledStepsAreDroppedFromTheLoop(t *testing.T) {
+	dir := t.TempDir()
+	path := write(t, dir, disabledFirstStep)
+	cfg := mustLoad(t, path, dir, env())
+	var got []string
+	for _, s := range cfg.EnabledSteps() {
+		got = append(got, s.Type)
+	}
 	if strings.Join(got, ",") != "prod_errors" {
 		t.Errorf("got = %v", got)
+	}
+}
+
+// Load keeps disabled steps so that naming one on the command line can still
+// run it.
+func TestDisabledStepsAreStillLoaded(t *testing.T) {
+	dir := t.TempDir()
+	path := write(t, dir, disabledFirstStep)
+	cfg := mustLoad(t, path, dir, env())
+	got := stepTypes(cfg)
+	if strings.Join(got, ",") != "failing_prs,prod_errors" {
+		t.Errorf("got = %v", got)
+	}
+	if cfg.Steps[0].Enabled {
+		t.Error("expected the first step to be marked disabled")
 	}
 }
 

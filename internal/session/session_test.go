@@ -4,7 +4,6 @@ import (
 	"context"
 	"strings"
 	"testing"
-	"time"
 )
 
 func result(stdout, stderr string, code int) Result {
@@ -103,32 +102,24 @@ func TestUsageAvailableTrueWhenCapacityRemains(t *testing.T) {
 	}
 }
 
-func TestHandleSessionSleepsAndReportsTrueOnExhaustion(t *testing.T) {
-	var slept time.Duration
-	origSleep := Sleep
-	defer func() { Sleep = origSleep }()
-	Sleep = func(d time.Duration) { slept = d }
-
+func TestHandleSessionReportsTokenExhaustion(t *testing.T) {
 	var actions []string
 	got := HandleSession("dependabot", result("usage limit reached", "", 0), &actions,
-		t.TempDir()+"/events.jsonl", 3600)
-	if !got {
-		t.Error("expected slept=true")
-	}
-	if slept != 3600*time.Second {
-		t.Errorf("slept = %v", slept)
+		t.TempDir()+"/events.jsonl")
+	if got != OutcomeTokenExhausted {
+		t.Errorf("outcome = %v", got)
 	}
 	if !anyContains(actions, "Token exhaustion") {
 		t.Errorf("actions = %v", actions)
 	}
 }
 
-func TestHandleSessionReportsFalseOnFailure(t *testing.T) {
+func TestHandleSessionReportsFailure(t *testing.T) {
 	var actions []string
 	got := HandleSession("dependabot", result("boom", "", 2), &actions,
-		t.TempDir()+"/events.jsonl", 3600)
-	if got {
-		t.Error("expected false")
+		t.TempDir()+"/events.jsonl")
+	if got != OutcomeFailed {
+		t.Errorf("outcome = %v", got)
 	}
 	if !anyContains(actions, "failed (exit 2)") {
 		t.Errorf("actions = %v", actions)
@@ -138,9 +129,9 @@ func TestHandleSessionReportsFalseOnFailure(t *testing.T) {
 func TestHandleSessionRecordsSuccess(t *testing.T) {
 	var actions []string
 	got := HandleSession("dependabot", result("PR created", "", 0), &actions,
-		t.TempDir()+"/events.jsonl", 3600)
-	if got {
-		t.Error("expected false")
+		t.TempDir()+"/events.jsonl")
+	if got != OutcomeOK {
+		t.Errorf("outcome = %v", got)
 	}
 	if !anyContains(actions, "completed") {
 		t.Errorf("actions = %v", actions)
