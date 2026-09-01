@@ -31,14 +31,22 @@ Each cycle:
 
 ## Configuration
 
-Configuration is read from `agent_loop.toml`. Resolution order for the config
+Configuration is read from `agent_loop.toml`. `agent_loop.example.toml` is a
+checked-in, fully annotated reference covering every step type and option —
+start from it:
+
+```sh
+cp agent_loop.example.toml agent_loop.toml
+```
+
+Resolution order for the config
 file: the `--config` flag, else `$AGENT_LOOP_CONFIG`, else `agent_loop.toml` at
 the repo root, else built-in defaults. For `[loop]` values, precedence is
 env var > TOML > built-in default.
 
 ```toml
 [loop]
-repo = "chadgh/class-cash"
+repo = "chadgh/code-caretaker"
 check_interval_seconds = 300
 token_sleep_seconds = 3600
 claude_timeout_seconds = 1800
@@ -66,10 +74,13 @@ of the step's known placeholders, and literal braces are escaped as `{{`/`}}`.
 ## Running
 
 ```sh
-go build -o agentloop .
-./agentloop                       # uses ./agent_loop.toml or built-in defaults
-./agentloop --config other.toml   # explicit config
-./agentloop --repo-root /path/to/repo
+make run                          # go run . --config agent_loop.toml
+make run CONFIG=other.toml        # a different config
+
+make build                        # build ./code-caretaker
+./code-caretaker                  # uses ./agent_loop.toml or built-in defaults
+./code-caretaker --config other.toml
+./code-caretaker --repo-root /path/to/repo
 ```
 
 The loop shells out to `claude`, `gh`, `git`, and (for `prod_errors`) `ssh`, so
@@ -91,6 +102,8 @@ internal/status         logging and the append-only JSONL status feed
 ## Development
 
 ```sh
-go test ./...
-go vet ./...
+make verify   # gofmt check, go vet, go test, go build
+make test
+make fmt
+make help     # all targets
 ```

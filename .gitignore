@@ -1,3 +1,4 @@
 /agentloop
+/code-caretaker
 *.test
 /.agent-status/
