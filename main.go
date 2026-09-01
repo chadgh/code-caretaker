@@ -1,5 +1,5 @@
 // Command agent_loop is the autonomous agent loop: wake up, run the configured
-// steps, sleep. This is a Go port of the class-cash scripts/agent_loop package.
+// steps, sleep.
 //
 // Steps come from agent_loop.toml (see internal/config for resolution order).
 // Each cycle walks them in configured order and dispatches a Claude session

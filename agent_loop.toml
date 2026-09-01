@@ -14,7 +14,7 @@
 #   CLAUDE_TIMEOUT_SECONDS, AGENT_STATUS_FILE
 
 [loop]
-repo = "chadgh/class-cash"
+repo = "chadgh/code-caretaker"
 check_interval_seconds = 300
 token_sleep_seconds = 3600
 claude_timeout_seconds = 1800
@@ -29,13 +29,6 @@ type = "failing_prs"
 [[step]]
 type = "dependabot_alerts"
 
-[[step]]
-type = "prod_errors"
-ssh_host = "class-cash.chaggie.com"
-ssh_user = "chadgh"
-service = "class-cash-api.service"
-lookback = "5 minutes ago"
-
 # New feature work is the only thing gated on the open-PR count.
 [[step]]
 type = "labeled_issues"
@@ -47,7 +40,6 @@ type = "command"
 name = "refine-issues"
 enabled = true
 check = "gh issue list --search \"no:assignee state:open label:needs-refinement\""
-# check = "gh issue list --label needs-refinement --state open | grep needs-refinement"
 prompt = """
 You are an expert in this software system and work to move issues labeled needs-refinement
 to have clarity and shape. Given the issues labeled needs-refinement you will work
@@ -92,51 +84,3 @@ or needs a human. If it should be able to be completed successfully by an AI age
 for-agent label. If a human needs to address things in the issue, apply the for-human label.
 Remove the needs-refinement label.
 """
-
-[[step]]
-type = "command"
-name = "address-teacher-feedback"
-enabled = true
-model = "sonnet"
-# check = "gh issue list --search \"no:assignee state:open label:teacher-feedback\" -L 1 --json number,body" 
-check = """
-    output=$(gh issue list --search "no:assignee state:open label:teacher-feedback" -L 1 --json number,body);
-    [ "$output" != "[]" ] && echo "$output"
-"""
-prompt = """
-You are a problem/bug and feature request expert. You will act as the product manager for
-this project.
-
-Given the output feedback. Lines starting with '>' are lines written by the teacher as
-feedback for the system maintainers. Lines not starting with '>' are information about the
-person who submitted and what page they were on.
-
-Analyze the feedback based on the context of the system. Determine if more information is
-needed or if there is enough to make a decision on what should be done with the feedback.
-Determine if (1) the feedback is clear and straightforward and just needs human decision on
-next steps, (2) the feedback is unclear or confusing and needs extra information from the
-person who submitted, (3) the feedback is duplicate of another open issue, or (4) the feedback is purely informational and just needs to be seen
-by @chadgh. In all cases after you've determined what situation the feedback is in, you are
-going to finish, by making a comment about your decision and possible next steps if applicable,
-remove the teacher-feedback label, add the for-human label, assign the issue to @chadgh.
-"""
-
-# Example of the no-code escape hatch. Copy this shape to try a new step:
-# give it a shell `check` command and a prompt; if the command prints
-# anything, that output lands in {output} and a session is dispatched.
-#
-# Optional `model` picks which Claude model runs the dispatched session
-# (passed to the `claude` CLI as `--model`); omit it to use the default.
-#
-# [[step]]
-# type = "command"
-# name = "stale-branches"
-# enabled = false
-# model = "claude-opus-4-8"
-# check = "git branch -r --merged origin/main | grep -v main"
-# prompt = """
-# You are an autonomous agent working on {repo}.
-# These remote branches are merged and stale:
-# {output}
-# Delete them.
-# """
