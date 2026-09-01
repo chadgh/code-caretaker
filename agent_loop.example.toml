@@ -25,8 +25,9 @@
 # -----------------------------------------------------------------------------
 # [loop] — global settings
 # -----------------------------------------------------------------------------
-# Every key here is optional; the value shown is the built-in default. Each can
-# also be overridden by an environment variable, which wins over this file:
+# `repo` is required and has no default; every other key here is optional and
+# the value shown is its built-in default. Each can also be overridden by an
+# environment variable, which wins over this file:
 #
 #   repo                    REPO
 #   check_interval_seconds  CHECK_INTERVAL_SECONDS
@@ -36,8 +37,9 @@
 #
 [loop]
 
-# The GitHub repository the loop operates on, as "owner/name". This is passed
-# to `gh` and interpolated into prompts as {repo}.
+# The GitHub repository the loop operates on, as "owner/name". Required: the
+# loop refuses to start without it. Passed to `gh` and interpolated into
+# prompts as {repo}.
 repo = "your-org/your-repo"
 
 # Seconds to sleep between cycles. 300 = check for work every five minutes.
@@ -74,7 +76,7 @@ status_file = ".agent-status/events.jsonl"
 #                 work faster than a human can merge it.
 #   prompt        replace the step's built-in prompt template.
 #
-# About `prompt`: it is a Python str.format-style template, validated at
+# About `prompt`: it is a brace-style template, validated at
 # startup. `{placeholder}` fields are substituted; a literal brace must be
 # doubled as `{{` or `}}`. Using a placeholder a step does not provide is a
 # startup error, so a typo fails fast instead of at 3am. Each step type's
@@ -104,8 +106,8 @@ type = "failing_prs"
 # already looks like a Dependabot PR (title contains "dependabot", or the head
 # branch starts with "dependabot/"), so it will not open a second one.
 #
-# NOTE: the built-in prompt names npm workspaces and `npm run typecheck`. For a
-# non-npm project, override `prompt` with your own build/test commands.
+# NOTE: the built-in prompt asks the session to work out the project's own
+# package manager and checks. Override `prompt` to name them explicitly.
 #
 # Params: none.
 # Prompt placeholders: {repo} {count} {alerts}
@@ -133,14 +135,13 @@ type = "dependabot_alerts"
 # own host and unit. It requires passwordless SSH (BatchMode) to the host.
 #
 # Params:
-#   ssh_host   host to connect to               (default "class-cash.chaggie.com")
-#   ssh_user   user to connect as               (default "chadgh")
-#   service    systemd unit to read             (default "class-cash-api.service")
+#   ssh_host   host to connect to               (required, no default)
+#   ssh_user   user to connect as               (required, no default)
+#   service    systemd unit to read             (required, no default)
 #   lookback   journalctl --since value         (default "5 minutes ago")
 # Prompt placeholders: {repo} {logs} {lookback} {service}
 #
-# The defaults are inherited from the project this loop was extracted from, so
-# always set all four explicitly rather than relying on them.
+# The step is a no-op until ssh_host, ssh_user and service are all set.
 [[step]]
 type = "prod_errors"
 enabled = false

@@ -13,8 +13,7 @@ import (
 	"github.com/chadgh/code-caretaker/internal/status"
 )
 
-// Collaborators are package variables so tests can substitute them, mirroring
-// the way the Python tests patched the loop's dependencies.
+// Collaborators are package variables so tests can substitute them.
 var (
 	resetToMain      = git.ResetToMain
 	usageAvailable   = session.UsageAvailable

@@ -6,21 +6,19 @@ import (
 	"strings"
 )
 
-// The step prompts are Python str.format templates: {name} is a named field,
-// {{ and }} are literal braces, and {} / {0} are anonymous or positional
-// fields. To keep TOML-authored prompts behaving exactly as they did under
-// Python, we reimplement just enough of that grammar here: a validator that
-// rejects unknown named placeholders and malformed braces at load time, and a
-// renderer that substitutes named fields.
+// The step prompts are brace-style templates: {name} is a named field, {{ and
+// }} are literal braces, and {} / {0} are anonymous or positional fields. This
+// file implements just enough of that grammar for TOML-authored prompts: a
+// validator that rejects unknown named placeholders and malformed braces at
+// load time, and a renderer that substitutes named fields.
 
 // parsedField is one {...} replacement field found in a template.
 type parsedField struct {
 	name string // the field name, before any ! conversion or : format spec
 }
 
-// parseTemplate walks a str.format-style template, returning the named
-// replacement fields it contains. It errors on malformed braces (a lone { or
-// }), mirroring Python's Formatter.parse.
+// parseTemplate walks a brace-style template, returning the named replacement
+// fields it contains. It errors on malformed braces (a lone { or }).
 func parseTemplate(template string) ([]parsedField, error) {
 	var fields []parsedField
 	runes := []rune(template)
@@ -45,7 +43,7 @@ func parseTemplate(template string) ([]parsedField, error) {
 			}
 			field := string(runes[i+1 : j])
 			// A field name ends at the first ! (conversion) or : (format
-			// spec), matching Python's field-name grammar.
+			// spec).
 			name := field
 			if idx := strings.IndexAny(name, "!:"); idx >= 0 {
 				name = name[:idx]
@@ -167,8 +165,8 @@ func isAllDigits(s string) bool {
 	return true
 }
 
-// formatList renders a slice the way Python prints a sorted list of strings,
-// e.g. ['a', 'b'], so error messages read as they did under Python.
+// formatList renders a slice of strings as a quoted, bracketed list,
+// e.g. ['a', 'b'], for error text.
 func formatList(items []string) string {
 	quoted := make([]string, len(items))
 	for i, it := range items {

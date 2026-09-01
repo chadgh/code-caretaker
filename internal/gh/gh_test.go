@@ -18,7 +18,7 @@ func TestGetOpenPRsParsesJSON(t *testing.T) {
 	stubRun(t, func(name string, args ...string) string {
 		return `[{"number":13,"title":"x","mergeable":"MERGEABLE","statusCheckRollup":[]}]`
 	})
-	prs := GetOpenPRs("chadgh/class-cash")
+	prs := GetOpenPRs("owner/repo")
 	if len(prs) != 1 || Number(prs[0]) != 13 {
 		t.Errorf("prs = %+v", prs)
 	}

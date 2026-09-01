@@ -13,7 +13,7 @@ import (
 // ProdErrorsType is the config `type` for the prod-errors step.
 const ProdErrorsType = "prod_errors"
 
-const prodErrorsPrompt = `You are an autonomous agent working on the class-cash GitHub repository ({repo}).
+const prodErrorsPrompt = `You are an autonomous agent working on the {repo} GitHub repository.
 
 The following errors appeared in production API logs (journalctl {service}) in the last {lookback}:
 
@@ -46,9 +46,9 @@ func newProdErrorsStep(cfg core.StepConfig) (core.Step, error) {
 	}
 	return &ProdErrorsStep{
 		Base:     base,
-		sshHost:  paramStr(cfg.Params, "ssh_host", "class-cash.chaggie.com"),
-		sshUser:  paramStr(cfg.Params, "ssh_user", "chadgh"),
-		service:  paramStr(cfg.Params, "service", "class-cash-api.service"),
+		sshHost:  paramStr(cfg.Params, "ssh_host", ""),
+		sshUser:  paramStr(cfg.Params, "ssh_user", ""),
+		service:  paramStr(cfg.Params, "service", ""),
 		lookback: paramStr(cfg.Params, "lookback", "5 minutes ago"),
 	}, nil
 }
@@ -78,8 +78,11 @@ func getProdErrors(sshHost, sshUser, service, lookback string) string {
 }
 
 // FindWork returns a Finding when the production journal has recent errors,
-// else nil.
+// else nil. It is a no-op until ssh_host, ssh_user and service are configured.
 func (s *ProdErrorsStep) FindWork(ctx *core.CycleContext) *core.Finding {
+	if s.sshHost == "" || s.sshUser == "" || s.service == "" {
+		return nil
+	}
 	logs := getProdErrors(s.sshHost, s.sshUser, s.service, s.lookback)
 	if logs == "" {
 		return nil

@@ -13,7 +13,7 @@ import (
 // LabeledIssuesType is the config `type` for the labeled-issues step.
 const LabeledIssuesType = "labeled_issues"
 
-const labeledIssuesPrompt = `You are an autonomous agent working on the class-cash GitHub repository ({repo}).
+const labeledIssuesPrompt = `You are an autonomous agent working on the {repo} GitHub repository.
 
 Implement the following GitHub issue and create a PR targeting the main branch.
 After creating the PR, post a comment on the issue linking to the PR.

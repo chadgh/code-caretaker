@@ -11,9 +11,9 @@ func paramStr(params map[string]any, key, def string) string {
 	return def
 }
 
-// paramInt reads an integer step param, mirroring Python's int() coercion:
-// native ints pass through, floats truncate, strings parse. The bool ok is
-// false when the key is absent or uncoercible.
+// paramInt reads an integer step param: native ints pass through, floats
+// truncate, strings parse. The bool ok is false when the key is absent or
+// uncoercible.
 func paramInt(params map[string]any, key string) (int, bool) {
 	v, ok := params[key]
 	if !ok {
@@ -43,7 +43,7 @@ func str(v any) string {
 }
 
 // numToString renders a JSON-decoded number (float64) as an integer string,
-// matching how Python printed the raw int from the API response.
+// so the raw int from the API response prints without a decimal point.
 func numToString(v any) string {
 	switch n := v.(type) {
 	case float64:

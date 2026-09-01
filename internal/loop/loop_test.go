@@ -28,7 +28,7 @@ func (f *fakeStep) FindWork(ctx *core.CycleContext) *core.Finding {
 
 func testConfig(t *testing.T) core.LoopConfig {
 	return core.LoopConfig{
-		Repo:                 "chadgh/class-cash",
+		Repo:                 "owner/repo",
 		CheckIntervalSeconds: 300,
 		TokenSleepSeconds:    3600,
 		ClaudeTimeoutSeconds: 1800,

@@ -1,4 +1,4 @@
-# Configuration for the autonomous agent loop (`npm run loop`).
+# Configuration for the autonomous agent loop (`code-caretaker`).
 #
 # The loop wakes up, walks the steps below in order, dispatches a Claude
 # session for the FIRST step that finds work, then sleeps. Order is priority.

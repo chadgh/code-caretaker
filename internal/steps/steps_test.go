@@ -26,7 +26,7 @@ func params(p map[string]any) func(*core.StepConfig) {
 
 func ctxWith(prs ...map[string]any) *core.CycleContext {
 	return &core.CycleContext{
-		Config:  core.LoopConfig{Repo: "chadgh/class-cash", RepoRoot: "/repo"},
+		Config:  core.LoopConfig{Repo: "owner/repo", RepoRoot: "/repo"},
 		OpenPRs: prs,
 	}
 }
@@ -50,7 +50,7 @@ func mustStep(t *testing.T, build func() (core.Step, error)) core.Step {
 }
 
 var (
-	failingCheck   = map[string]any{"name": "Lint, typecheck, test, build", "status": "COMPLETED", "conclusion": "FAILURE", "detailsUrl": "https://github.com/chadgh/class-cash/actions/runs/123"}
+	failingCheck   = map[string]any{"name": "Lint, typecheck, test, build", "status": "COMPLETED", "conclusion": "FAILURE", "detailsUrl": "https://github.com/owner/repo/actions/runs/123"}
 	cancelledCheck = map[string]any{"name": "E2E", "status": "COMPLETED", "conclusion": "CANCELLED", "detailsUrl": "u"}
 	passingCheck   = map[string]any{"name": "Lint, typecheck, test, build", "status": "COMPLETED", "conclusion": "SUCCESS", "detailsUrl": "u"}
 	pendingCheck   = map[string]any{"name": "Lint", "status": "IN_PROGRESS", "conclusion": nil, "detailsUrl": "u"}
@@ -187,7 +187,7 @@ func TestFailingRespectsMaxOpenPRs(t *testing.T) {
 func TestFailingCustomPromptRendered(t *testing.T) {
 	s := failingStep(t, prompt("Fix PR {pr_number} on {pr_branch} in {repo}"))
 	f := core.Check(s, ctxWith(failingPRMap()))
-	if f.Prompt != "Fix PR 13 on feat/some-work in chadgh/class-cash" {
+	if f.Prompt != "Fix PR 13 on feat/some-work in owner/repo" {
 		t.Errorf("prompt = %q", f.Prompt)
 	}
 }
@@ -205,21 +205,21 @@ func withRunOutput(t *testing.T, stdout string, code int) {
 
 func TestGetDependabotAlertsReturnsOpen(t *testing.T) {
 	withRunOutput(t, sampleAlertsJSON, 0)
-	if len(getDependabotAlerts("chadgh/class-cash")) != 1 {
+	if len(getDependabotAlerts("owner/repo")) != 1 {
 		t.Error("expected 1 alert")
 	}
 }
 
 func TestGetDependabotAlertsEmptyOnGhError(t *testing.T) {
 	withRunOutput(t, "", 1)
-	if getDependabotAlerts("chadgh/class-cash") != nil {
+	if getDependabotAlerts("owner/repo") != nil {
 		t.Error("expected nil on gh error")
 	}
 }
 
 func TestGetDependabotAlertsEmptyOnMalformed(t *testing.T) {
 	withRunOutput(t, "not json", 0)
-	if getDependabotAlerts("chadgh/class-cash") != nil {
+	if getDependabotAlerts("owner/repo") != nil {
 		t.Error("expected nil on malformed json")
 	}
 }
@@ -280,7 +280,7 @@ func TestDependabotFallsThroughWhenPRExists(t *testing.T) {
 func TestDependabotCustomPrompt(t *testing.T) {
 	withRunOutput(t, sampleAlertsJSON, 0)
 	f := core.Check(dependabotStep(t, prompt("{count} alerts in {repo}")), ctxWith())
-	if f.Prompt != "1 alerts in chadgh/class-cash" {
+	if f.Prompt != "1 alerts in owner/repo" {
 		t.Errorf("prompt = %q", f.Prompt)
 	}
 }
@@ -420,7 +420,7 @@ func TestCommandFindWorkWithOutput(t *testing.T) {
 	s := mustStep(t, func() (core.Step, error) { return newCommandStep(commandCfg()) })
 	f := core.Check(s, ctxWith())
 	if f == nil || f.Label != "stale-branches" ||
-		f.Prompt != "Clean up in chadgh/class-cash:\nbranch-a\nbranch-b" {
+		f.Prompt != "Clean up in owner/repo:\nbranch-a\nbranch-b" {
 		t.Errorf("finding = %+v", f)
 	}
 }

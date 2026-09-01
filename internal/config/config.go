@@ -45,8 +45,10 @@ type loopField struct {
 	isInt   bool
 }
 
+// loopFields lists the [loop] settings. An empty def means the setting has no
+// built-in default and must be supplied by the config file or the env var.
 var loopFields = []loopField{
-	{"repo", "REPO", "chadgh/class-cash", false},
+	{"repo", "REPO", "", false},
 	{"check_interval_seconds", "CHECK_INTERVAL_SECONDS", 300, true},
 	{"token_sleep_seconds", "TOKEN_SLEEP_SECONDS", 3600, true},
 	{"claude_timeout_seconds", "CLAUDE_TIMEOUT_SECONDS", 1800, true},
@@ -103,13 +105,13 @@ func readTOML(path string) (rawConfig, error) {
 	return raw, nil
 }
 
-// coerceInt reproduces Python's int coercion: native ints pass through,
+// coerceInt coerces a config value to an int: native ints pass through,
 // strings (from env vars) are parsed, and bools/floats are rejected rather
 // than silently truncated.
 func coerceInt(value any, source string) (int, error) {
 	switch v := value.(type) {
 	case bool:
-		return 0, cfgErr("%s must be an integer, got %s", source, pyRepr(value))
+		return 0, cfgErr("%s must be an integer, got %s", source, repr(value))
 	case int:
 		return v, nil
 	case int64:
@@ -117,11 +119,11 @@ func coerceInt(value any, source string) (int, error) {
 	case string:
 		n, err := strconv.Atoi(strings.TrimSpace(v))
 		if err != nil {
-			return 0, cfgErr("%s must be an integer, got %s", source, pyRepr(value))
+			return 0, cfgErr("%s must be an integer, got %s", source, repr(value))
 		}
 		return n, nil
 	default:
-		return 0, cfgErr("%s must be an integer, got %s", source, pyRepr(value))
+		return 0, cfgErr("%s must be an integer, got %s", source, repr(value))
 	}
 }
 
@@ -136,19 +138,15 @@ func coerceBool(value any, source string) (bool, error) {
 	if b, ok := value.(bool); ok {
 		return b, nil
 	}
-	return false, cfgErr("%s must be a boolean, got %s", source, pyRepr(value))
+	return false, cfgErr("%s must be a boolean, got %s", source, repr(value))
 }
 
-// pyRepr renders a value roughly the way Python's repr would, for error text.
-func pyRepr(value any) string {
+// repr renders a value for error text: strings are quoted, everything else
+// prints as itself.
+func repr(value any) string {
 	switch v := value.(type) {
 	case string:
 		return "'" + v + "'"
-	case bool:
-		if v {
-			return "True"
-		}
-		return "False"
 	default:
 		return fmt.Sprintf("%v", v)
 	}
@@ -185,13 +183,20 @@ func buildLoopConfig(table map[string]any, repoRoot string, env map[string]strin
 		}
 	}
 
+	repo := values["repo"].(string)
+	if strings.TrimSpace(repo) == "" {
+		return core.LoopConfig{}, cfgErr(
+			"[loop].repo is required: set it in the config file or the " +
+				"REPO environment variable (e.g. \"owner/name\").")
+	}
+
 	statusFile := values["status_file"].(string)
 	if !filepath.IsAbs(statusFile) {
 		statusFile = filepath.Join(repoRoot, statusFile)
 	}
 
 	return core.LoopConfig{
-		Repo:                 values["repo"].(string),
+		Repo:                 repo,
 		CheckIntervalSeconds: values["check_interval_seconds"].(int),
 		TokenSleepSeconds:    values["token_sleep_seconds"].(int),
 		ClaudeTimeoutSeconds: values["claude_timeout_seconds"].(int),

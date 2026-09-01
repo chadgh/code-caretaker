@@ -5,8 +5,8 @@ import (
 	"testing"
 )
 
-// fakeStep mirrors the Python test's _FakeStep: default prompt with {repo} and
-// {thing}, rendering "something" for thing.
+// fakeStep has a default prompt with {repo} and {thing}, rendering "something"
+// for thing.
 type fakeStep struct {
 	Base
 }
@@ -55,13 +55,13 @@ func withMaxPRs(n int) func(*StepConfig) {
 }
 
 func makeCtx(prs ...map[string]any) *CycleContext {
-	return &CycleContext{Config: LoopConfig{Repo: "chadgh/class-cash"}, OpenPRs: prs}
+	return &CycleContext{Config: LoopConfig{Repo: "owner/repo"}, OpenPRs: prs}
 }
 
 func TestStepUsesDefaultPromptWhenNoOverride(t *testing.T) {
 	step := newFake(t, stepConfig("fake"))
 	got := Check(step, makeCtx()).Prompt
-	if got != "default prompt for chadgh/class-cash about something" {
+	if got != "default prompt for owner/repo about something" {
 		t.Errorf("prompt = %q", got)
 	}
 }
@@ -69,7 +69,7 @@ func TestStepUsesDefaultPromptWhenNoOverride(t *testing.T) {
 func TestStepUsesCustomPromptWhenProvided(t *testing.T) {
 	step := newFake(t, stepConfig("fake", withPrompt("custom {thing} in {repo}")))
 	got := Check(step, makeCtx()).Prompt
-	if got != "custom something in chadgh/class-cash" {
+	if got != "custom something in owner/repo" {
 		t.Errorf("prompt = %q", got)
 	}
 }

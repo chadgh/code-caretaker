@@ -14,7 +14,7 @@ import (
 // DependabotType is the config `type` for the Dependabot step.
 const DependabotType = "dependabot_alerts"
 
-const dependabotPrompt = `You are an autonomous agent working on the class-cash GitHub repository ({repo}).
+const dependabotPrompt = `You are an autonomous agent working on the {repo} GitHub repository.
 
 There are {count} open Dependabot security alert(s). Resolve all of them in a single batch PR.
 
@@ -22,9 +22,9 @@ Alerts:
 {alerts}
 
 Steps:
-1. Update the affected packages across all workspaces (apps/api, apps/web, packages/types) to their patched versions.
-2. Run ` + "`npm install`" + ` from the repo root to update package-lock.json.
-3. Run ` + "`npm run typecheck && npm run test`" + ` to confirm nothing breaks.
+1. Update the affected packages to their patched versions, across every workspace or module that depends on them.
+2. Refresh the lockfile with the project's package manager.
+3. Run the project's checks (build, typecheck, tests) to confirm nothing breaks.
 4. Create a PR targeting the main branch titled "chore: resolve Dependabot security alerts (batch)".
 
 IMPORTANT: Before modifying code locally, ensure you stash changes that are unrelated. Also check stashed changes that might be related.

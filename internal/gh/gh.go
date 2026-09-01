@@ -28,8 +28,7 @@ var sleepFn = time.Sleep
 var runOutput = func(name string, args ...string) string {
 	out, err := exec.Command(name, args...).Output()
 	if err != nil {
-		// Mirror capture_output with check=False: on failure the caller
-		// falls back to empty output.
+		// On failure the caller falls back to empty output.
 		if len(out) == 0 {
 			return ""
 		}

@@ -4,10 +4,6 @@ An autonomous agent loop, written in Go. It wakes up on an interval, walks a
 list of prioritized steps, and dispatches a Claude Code session for the first
 step that finds work — then sleeps and repeats.
 
-This is a Go port of the Python `scripts/agent_loop` package from
-[class-cash](https://github.com/chadgh/class-cash). The behavior and
-configuration format are intentionally identical.
-
 ## How it works
 
 Each cycle:
@@ -42,11 +38,12 @@ cp agent_loop.example.toml agent_loop.toml
 Resolution order for the config
 file: the `--config` flag, else `$AGENT_LOOP_CONFIG`, else `agent_loop.toml` at
 the repo root, else built-in defaults. For `[loop]` values, precedence is
-env var > TOML > built-in default.
+env var > TOML > built-in default. `repo` is the one setting with no default —
+the loop refuses to start until the config file or `REPO` supplies it.
 
 ```toml
 [loop]
-repo = "chadgh/code-caretaker"
+repo = "owner/name"
 check_interval_seconds = 300
 token_sleep_seconds = 3600
 claude_timeout_seconds = 1800
@@ -63,9 +60,9 @@ max_open_prs = 3
 
 Every step accepts these common keys: `enabled` (default true), `name` (label
 for logs), `prompt` (override the built-in template), and `max_open_prs` (skip
-the step when more than N PRs are open). A custom `prompt` is a Python
-`str.format`-style template validated at startup — `{name}` fields must be one
-of the step's known placeholders, and literal braces are escaped as `{{`/`}}`.
+the step when more than N PRs are open). A custom `prompt` is a brace-style
+template validated at startup — `{name}` fields must be one of the step's
+known placeholders, and literal braces are escaped as `{{`/`}}`.
 
 `[loop]` values can be overridden by these env vars: `REPO`,
 `CHECK_INTERVAL_SECONDS`, `TOKEN_SLEEP_SECONDS`, `CLAUDE_TIMEOUT_SECONDS`,
@@ -78,7 +75,7 @@ make run                          # go run . --config agent_loop.toml
 make run CONFIG=other.toml        # a different config
 
 make build                        # build ./code-caretaker
-./code-caretaker                  # uses ./agent_loop.toml or built-in defaults
+./code-caretaker                  # uses ./agent_loop.toml, or REPO plus built-in defaults
 ./code-caretaker --config other.toml
 ./code-caretaker --repo-root /path/to/repo
 ```

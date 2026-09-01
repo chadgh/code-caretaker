@@ -18,7 +18,7 @@ var failedConclusions = map[string]bool{"FAILURE": true, "CANCELLED": true}
 // right after a push), so only an explicit "CONFLICTING" counts as a conflict.
 const conflicting = "CONFLICTING"
 
-const failingPrsPrompt = `You are an autonomous agent working on the class-cash GitHub repository ({repo}).
+const failingPrsPrompt = `You are an autonomous agent working on the {repo} GitHub repository.
 
 PR #{pr_number} "{pr_title}" is failing:
 

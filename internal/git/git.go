@@ -12,7 +12,6 @@ func ResetToMain(repoRoot string) {
 func run(dir string, name string, args ...string) {
 	cmd := exec.Command(name, args...)
 	cmd.Dir = dir
-	// Best-effort: output and errors are intentionally ignored, matching the
-	// original's check=False, capture_output=True.
+	// Best-effort: output and errors are intentionally ignored.
 	_ = cmd.Run()
 }
